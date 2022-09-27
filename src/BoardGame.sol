@@ -11,6 +11,7 @@ contract BoardGame is VRFConsumerBaseV2 {
         uint32 speed;
         uint32 wealth;
         bool isYourTurnInProgress;
+        string name;
     }
 
     VRFCoordinatorV2Interface internal immutable i_vrfCoordinator;
@@ -22,7 +23,9 @@ contract BoardGame is VRFConsumerBaseV2 {
 
     mapping(address => Profile) internal players;
     mapping(uint256 => address) internal requestIds;
+    address[] internal playerAddresses;
 
+    event NewPlayer(address indexed player, string indexed name);
     event NewTurn(address indexed player);
     event Moved(address indexed player, uint32 indexed newFieldPosition);
 
@@ -39,6 +42,18 @@ contract BoardGame is VRFConsumerBaseV2 {
         i_callbackGasLimit = callbackGasLimit;
         i_requestConfirmations = requestConfirmations;
         i_numWords = 1;
+    }
+
+    function register(string memory name) external {
+        require(
+            bytes(players[msg.sender].name).length == 0,
+            "Already registered"
+        );
+
+        players[msg.sender].name = name;
+        playerAddresses.push(msg.sender);
+
+        emit NewPlayer(msg.sender, name);
     }
 
     function roleDice() external {
@@ -69,15 +84,33 @@ contract BoardGame is VRFConsumerBaseV2 {
         returns (
             uint32 happiness,
             uint32 speed,
-            uint32 wealth
+            uint32 wealth,
+            uint32 fieldPosition,
+            string memory name
         )
     {
         Profile memory playersProfile = players[player];
         return (
             playersProfile.happiness,
             playersProfile.speed,
-            playersProfile.wealth
+            playersProfile.wealth,
+            playersProfile.fieldPosition,
+            playersProfile.name
         );
+    }
+
+    function getAllPlayers() external view returns (Profile[] memory) {
+        uint256 length = playerAddresses.length;
+        Profile[] memory _players = new Profile[](length);
+
+        for (uint i = 0; i < length; ) {
+            _players[i] = players[playerAddresses[i]];
+            unchecked {
+                ++i;
+            }
+        }
+
+        return _players;
     }
 
     function getReward(uint32 fieldPosition)
